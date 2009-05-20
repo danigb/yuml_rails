@@ -26,7 +26,10 @@ module Yuml
 
     def generate(stream)
       names = '<img src="http://yuml.me/diagram/class/'
-      @models.sort.each {|m| names << "[#{m}]," }
+      @models.keys.sort.each do |name|
+        model = @models[name]
+        model.relations.each {|r| names << "#{r},"}
+      end
       stream << names.chop
       stream << '" />'
     end
@@ -44,13 +47,17 @@ module Yuml
         if line =~ CLASS_MATCHER
           parent = get_model($2)
           model = get_model($1)
+          model.parent(parent)
         end
       end
     end
 
 
     def get_model(name)
-      @models[name] ||= UmlModel.new(name)
+      unless @models[name]
+        puts "Adding #{name}"
+        @models[name] = UmlModel.new(name)
+      end
       @models[name]
     end
 
@@ -74,13 +81,40 @@ BOTTOM
 
   class UmlModel
     attr_accessor :name
+    attr_accessor :relations
     
     def initialize(name)
       @name = name
+      @relations = []
+    end
+
+    def parent(parent)
+      @relations << Relation.new(self, parent, Relation::Inheritance)
     end
 
     def to_s
       @name
+    end
+  end
+
+  class Relation
+    Inheritance = '^'
+    
+    def initialize(c1, c2, type)
+      @c1 = c1
+      @c2 = c2
+      @symbol = type
+    end
+
+    def to_s
+      "[#{@c1}]#{@symbol}[#{@c2}]"
+    end
+
+    def yuml_type
+      case type
+      when :inheritance
+        '^'
+      end
     end
   end
 
