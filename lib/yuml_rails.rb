@@ -3,8 +3,6 @@ module Yuml
   class Dumper #:nodoc:
     private_class_method :new
 
-    CLASS_MATCHER = /^class ([a-zA-Z_-]+)\s*<\s*([a-zA-Z:_]+)\s*$/
-
     def self.dump(stream=STDOUT)
       new.dump(stream)
       stream
@@ -41,81 +39,92 @@ module Yuml
       end
     end
 
+    CLASS_MATCHER = /^\s*class ([a-zA-Z_-]+)\s*<\s*([a-zA-Z:_]+)\s*$/
+    BELONGS_TO_MATCHER = /^\s*belongs_to :?([a-z_]+)/
     def model(file, dir)
       file = File.new(File.join(dir, file))
       file.readlines.each do |line|
-        if line =~ CLASS_MATCHER
-          parent = get_model($2)
-          model = get_model($1)
-          model.parent(parent)
-        end
+        current_model = add_class($1, $2) if line =~ CLASS_MATCHER
+        add_belongs_to(current_model, $1) if line =~ BELONGS_TO_MATCHER
       end
     end
+  end
+
+  def add_class(model_name, parent_name)
+    parent = get_model(model_name)
+    model = get_model(parent_name)
+    model.parent(parent)
+    model
+  end
+
+  def add_belongs_to(model, other)
+    puts other
+  end
 
 
-    def get_model(name)
-      unless @models[name]
-        puts "Adding #{name}"
-        @models[name] = UmlModel.new(name)
-      end
-      @models[name]
+  def get_model(name)
+    unless @models[name]
+      puts "Adding #{name}"
+      @models[name] = UmlModel.new(name)
     end
+    @models[name]
+  end
 
-    def header(stream)
-      stream.puts <<HEADER
+  def header(stream)
+    stream.puts <<HEADER
 
 <html>
   <head><title>YUML rails class diagram</title>
   </head><body>
 HEADER
-    end
+  end
 
-    def bottom(stream)
-      stream.puts <<BOTTOM
+  def bottom(stream)
+    stream.puts <<BOTTOM
 </body></html>
 
 BOTTOM
-    end
-
   end
 
-  class UmlModel
-    attr_accessor :name
-    attr_accessor :relations
+end
+
+class UmlModel
+  attr_accessor :name
+  attr_accessor :relations
     
-    def initialize(name)
-      @name = name
-      @relations = []
-    end
-
-    def parent(parent)
-      @relations << Relation.new(self, parent, Relation::Inheritance)
-    end
-
-    def to_s
-      @name
-    end
+  def initialize(name)
+    @name = name
+    @relations = []
   end
 
-  class Relation
-    Inheritance = '^'
+  def parent(parent)
+    @relations << Relation.new(self, parent, Relation::Inheritance)
+  end
+
+  def to_s
+    @name
+  end
+end
+
+class Relation
+  Inheritance = '^'
     
-    def initialize(c1, c2, type)
-      @c1 = c1
-      @c2 = c2
-      @symbol = type
-    end
+  def initialize(c1, c2, type)
+    @c1 = c1
+    @c2 = c2
+    @symbol = type
+  end
 
-    def to_s
-      "[#{@c1}]#{@symbol}[#{@c2}]"
-    end
+  def to_s
+    "[#{@c1}]#{@symbol}[#{@c2}]"
+  end
 
-    def yuml_type
-      case type
-      when :inheritance
-        '^'
-      end
+  def yuml_type
+    case type
+    when :inheritance
+      '^'
     end
   end
+end
 
 end
