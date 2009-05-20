@@ -1,73 +1,47 @@
 
+
 module YUML
   class Dumper #:nodoc:
     private_class_method :new
 
     def self.dump(stream=STDOUT)
-      new.dump(stream)
-      stream
-    end
-
-    def initialize()
-      @models = {}
-    end
-
-    def dump(stream)
-      header(stream)
-      models()
-      generate(stream)
-      bottom(stream)
-    end
-
-    private
-
-
-    def generate(stream)
-      names = '<img src="http://yuml.me/diagram/class/'
-      @models.keys.sort.each do |name|
-        model = @models[name]
-        model.relations.each {|r| names << "#{r},"}
-      end
-      stream << names.chop
-      stream << '" />'
-    end
-
-    def models()
+      parser = Parser.new
       dir = File.join(RAILS_ROOT, '/app/models')
-      Dir.foreach(dir) do |file|
-        model(file, dir) unless file == '.' || file == '..'
+      Dir.foreach(dir) do |name|
+        unless name == '.' || name == '..'
+          file = File.new(File.join(dir, name))
+          parser.parse(file.readlines)
+        end
       end
+      serializer = YUML::Serializer.new(stream)
+      serializer.to_html(parser.diagram)
     end
-
-
-    def model(file, dir)
-      file = File.new(File.join(dir, file))
-
+  end
+  
+  class Serializer
+    def initialize(stream)
+      @stream = stream
     end
-
-
-
-
-    def camelize(name)
-      name.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
-    end
-
-    def header(stream)
-      stream.puts <<HEADER
-
+    
+    def to_html(diagram)
+      @stream.puts <<HEADER
 <html>
   <head><title>YUML rails class diagram</title>
   </head><body>
 HEADER
-    end
 
-    def bottom(stream)
-      stream.puts <<BOTTOM
+      names = '<img src="http://yuml.me/diagram/class/'
+      diagram.each do |model|
+        model.relations.each {|r| names << "#{r},"}
+      end
+      @stream << names.chop
+      @stream << '" />'
+
+      @stream.puts <<BOTTOM
 </body></html>
 
 BOTTOM
     end
-
   end
 
   class Parser
@@ -76,7 +50,7 @@ BOTTOM
       @diagram = diagram
     end
 
-    CLASS_MATCHER = /^\s*class ([a-zA-Z_-]+)\s*(<\s*([a-zA-Z:_]+)\s*)?$/
+    CLASS_MATCHER = /^\s*class ([a-zA-Z_-]+)\s*(?:<\s*([a-zA-Z:_]+)\s*)?$/
     BELONGS_TO_MATCHER = /^\s*belongs_to :?([a-z_]+)/
     HAS_ONE_MATCHER = /^\s*belongs_to :?([a-z_]+)/
     def parse(lines)
@@ -103,6 +77,11 @@ BOTTOM
       other = @diagram.model(camelize(other_name))
       model.send(relation, other)
     end
+
+
+    def camelize(name)
+      name.to_s.gsub(/\/(.?)/) { "::#{$1.upcase}" }.gsub(/(?:^|_)(.)/) { $1.upcase }
+    end
   end
 
   class ClassDiagram
@@ -116,7 +95,6 @@ BOTTOM
       name = name.to_s
       unless @models[name]
         @models[name] = ClassModel.new(name)
-        puts "Add class #{name}"
       end
       @models[name]
     end
@@ -127,6 +105,10 @@ BOTTOM
 
     def size
       @models.size
+    end
+
+    def each
+      @models.each_value {|v| yield v}
     end
   end
 
@@ -159,22 +141,18 @@ BOTTOM
   class Relation
     Inheritance = '^'
     Directional = '->'
-    
-    def initialize(c1, c2, type)
-      @c1 = c1
-      @c2 = c2
-      @symbol = type
+
+    attr_accessor :type, :origin, :target
+
+
+    def initialize(origin, target, type)
+      @origin = origin
+      @target = target
+      @type = type
     end
 
     def to_s
-      "[#{@c1}]#{@symbol}[#{@c2}]"
-    end
-
-    def yuml_type
-      case type
-      when :inheritance
-        '^'
-      end
+      "[#{@origin}]#{@type}[#{@target}]"
     end
   end
 

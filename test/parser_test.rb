@@ -29,5 +29,14 @@ class ParserTest < Test::Unit::TestCase
       assert @diagram[:Simple]
       assert @diagram['MyModule::TheClass']
     end
+
+    should "parse belongs_to relations" do
+      file = "class Simple\nbelongs_to :user\nend"
+      @parser.parse(file)
+      assert @diagram[:Simple]
+      relation = @diagram[:Simple].relations[0]
+      assert relation
+      assert_equal YUML::Relation::Directional, relation.type
+    end
   end
 end
