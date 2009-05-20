@@ -5,7 +5,7 @@
 task :yuml  do
   require File.join(File.dirname(__FILE__), '../lib/yuml_rails.rb')
   File.open(File.join(RAILS_ROOT, 'doc/yuml.html'), 'w') do |file|
-    Yuml::Dumper.dump(file)
+    YUML::Dumper.dump(file)
   end
   puts "YUML html page created as doc/yuml.html"
 end
